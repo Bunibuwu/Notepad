@@ -51,6 +51,30 @@ jobs:
         lto: auto
         disable-console: yes
 
+    - name: Make Linux/macOS binaries double-clickable
+      if: runner.os != 'Windows'
+      run: |
+        cd build
+        # Rename the main binary to Notepad.exe for consistency
+        mv main Notepad.exe || true
+        chmod +x Notepad.exe
+
+        if [[ "$RUNNER_OS" == "macOS" ]]; then
+          # Create .command wrapper for macOS double-click
+          echo "./Notepad.exe" > Notepad.command
+          chmod +x Notepad.command
+        else
+          # Create .desktop launcher for Linux double-click
+          cat <<EOF > Notepad.desktop
+          [Desktop Entry]
+          Name=Notepad
+          Exec=$(pwd)/Notepad.exe
+          Type=Application
+          Terminal=false
+          EOF
+          chmod +x Notepad.desktop
+        fi
+
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
