@@ -28,98 +28,148 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # Windows Build - with auto-download approval
-    - name: Build Windows Executable
+    # Common build step for all platforms
+    - name: Build with Nuitka
+      run: |
+        mkdir -p build
+        echo "Starting ${{ runner.os }} build..."
+        
+        # Basic Nuitka command that should work everywhere
+        python -m nuitka main.py \
+          --standalone \
+          --enable-plugin=pyside6 \
+          --include-data-dir=Themes=Themes \
+          --include-data-file=Main.ui=. \
+          --include-data-file=Find.ui=. \
+          --include-data-file=FindNext.ui=. \
+          --include-data-file=FindPrev.ui=. \
+          --include-data-file=Replace.ui=. \
+          --include-data-file=Themes.ui=. \
+          --include-data-file=settings.json=. \
+          --include-package-data=qt_themes \
+          --include-qt-plugins=sensible \
+          --output-dir=build \
+          --jobs=1 \
+          --lto=no \
+          --assume-yes-for-downloads
+
+    # Windows-specific: Rename and disable console
+    - name: Post-process Windows Build
       if: runner.os == 'Windows'
       run: |
-        mkdir -p build
-        echo "Starting Windows build..."
-        echo "yes" | python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=1 --lto=no --windows-console-mode=disable --output-filename=Notepad --assume-yes-for-downloads
+        cd build
+        echo "=== Windows build contents ==="
+        ls -la
+        # Rename main.exe to Notepad.exe if it exists
+        if [ -f "main.exe" ]; then
+          mv main.exe Notepad.exe
+          echo "Renamed main.exe to Notepad.exe"
+        fi
+        # If we have a dist folder, rename it
+        if [ -d "main.dist" ]; then
+          mv main.dist Notepad.dist
+          echo "Renamed main.dist to Notepad.dist"
+          # Also rename the executable inside
+          if [ -f "Notepad.dist/main.exe" ]; then
+            mv Notepad.dist/main.exe Notepad.dist/Notepad.exe
+            echo "Renamed internal executable"
+          fi
+        fi
 
-    # macOS Build - simplified
-    - name: Build macOS App Bundle
-      if: runner.os == 'macOS'
-      run: |
-        mkdir -p build
-        echo "Starting macOS build..."
-        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=1 --lto=no --output-filename=Notepad
-
-    # Linux Build - simplified
-    - name: Build Linux Executable
-      if: runner.os == 'Linux'
-      run: |
-        mkdir -p build
-        echo "Starting Linux build..."
-        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=1 --lto=no --output-filename=Notepad
-
-    # Post-build steps for macOS
+    # macOS-specific: Create app bundle
     - name: Post-process macOS Build
       if: runner.os == 'macOS'
       run: |
         cd build
-        # Check what was actually created
         echo "=== macOS build contents ==="
         ls -la
-        # If we have a .dist folder but no .app, create one manually
-        if [ -d "Notepad.dist" ] && [ ! -d "Notepad.app" ]; then
-          echo "Creating macOS app bundle manually..."
+        
+        # Rename main to Notepad if it exists
+        if [ -f "main" ]; then
+          mv main Notepad
+          chmod +x Notepad
+          echo "Renamed main to Notepad"
+        fi
+        
+        # Rename dist folder
+        if [ -d "main.dist" ]; then
+          mv main.dist Notepad.dist
+          echo "Renamed main.dist to Notepad.dist"
+          # Rename internal executable
+          if [ -f "Notepad.dist/main" ]; then
+            mv Notepad.dist/main Notepad.dist/Notepad
+            chmod +x Notepad.dist/Notepad
+            echo "Renamed internal executable"
+          fi
+        fi
+        
+        # Create app bundle
+        if [ -d "Notepad.dist" ]; then
+          echo "Creating macOS app bundle..."
           mkdir -p Notepad.app/Contents/MacOS
           mkdir -p Notepad.app/Contents/Resources
           cp -r Notepad.dist/* Notepad.app/Contents/MacOS/
-          # Create Info.plist
-          cat > Notepad.app/Contents/Info.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleExecutable</key>
-              <string>Notepad</string>
-              <key>CFBundleIdentifier</key>
-              <string>com.notepad.app</string>
-              <key>CFBundleName</key>
-              <string>Notepad</string>
-              <key>CFBundleVersion</key>
-              <string>1.0</string>
-              <key>CFBundleShortVersionString</key>
-              <string>1.0</string>
-              <key>NSHighResolutionCapable</key>
-              <true/>
-          </dict>
-          </plist>
-          EOF
+          
+          # Create Info.plist without heredoc
+          cat > Notepad.app/Contents/Info.plist << "EOF"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Notepad</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.notepad.app</string>
+    <key>CFBundleName</key>
+    <string>Notepad</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
+EOF
+          echo "Created macOS app bundle"
         fi
 
-    # Make executables
-    - name: Make Executables
-      if: runner.os != 'Windows'
+    # Linux-specific: Rename and make executable
+    - name: Post-process Linux Build
+      if: runner.os == 'Linux'
       run: |
         cd build
-        echo "=== Build contents ==="
+        echo "=== Linux build contents ==="
         ls -la
-        if [ -f "Notepad" ]; then
+        
+        # Rename main to Notepad if it exists
+        if [ -f "main" ]; then
+          mv main Notepad
           chmod +x Notepad
-          echo "Made Notepad executable"
+          echo "Renamed main to Notepad"
         fi
-        if [ -d "Notepad.dist" ] && [ -f "Notepad.dist/Notepad" ]; then
-          chmod +x Notepad.dist/Notepad
-          echo "Made Notepad.dist/Notepad executable"
-        fi
-        if [ -d "Notepad.app" ]; then
-          find Notepad.app -name "Notepad" -exec chmod +x {} \;
-          echo "Made Notepad.app executable"
+        
+        # Rename dist folder
+        if [ -d "main.dist" ]; then
+          mv main.dist Notepad.dist
+          echo "Renamed main.dist to Notepad.dist"
+          # Rename internal executable
+          if [ -f "Notepad.dist/main" ]; then
+            mv Notepad.dist/main Notepad.dist/Notepad
+            chmod +x Notepad.dist/Notepad
+            echo "Renamed internal executable"
+          fi
         fi
 
-    # Verify and list all outputs
-    - name: Verify Build Outputs
+    # Final verification
+    - name: Verify Final Outputs
       run: |
-        echo "=== Complete build directory structure ==="
+        echo "=== Final outputs for ${{ runner.os }} ==="
         cd build
         find . -type f -name "Notepad*" -o -name "*.exe" 2>/dev/null | head -20
         find . -type d -name "*.app" -o -name "*.dist" 2>/dev/null | head -10
-        echo "=== All files in build/ ==="
-        ls -la
 
-    # Upload artifacts - more flexible paths
+    # Upload artifacts
     - name: Upload Windows Artifacts
       if: runner.os == 'Windows'
       uses: actions/upload-artifact@v4
@@ -151,10 +201,10 @@ jobs:
           build/Notepad.dist/
         if-no-files-found: warn
 
-    # Upload entire build directory as backup
-    - name: Upload Complete Build Directory
+    # Upload complete build directory as backup
+    - name: Upload Complete Build
       uses: actions/upload-artifact@v4
       with:
-        name: Build-Directory-${{ runner.os }}
+        name: Complete-Build-${{ runner.os }}
         path: build/
         if-no-files-found: warn
