@@ -11,7 +11,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120  # 2 hour timeout
+    timeout-minutes: 120
 
     steps:
     - name: Checkout
@@ -28,23 +28,23 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # Windows Build - produces Notepad.exe
+    # Windows Build - with auto-download approval
     - name: Build Windows Executable
       if: runner.os == 'Windows'
       run: |
         mkdir -p build
         echo "Starting Windows build..."
-        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=1 --lto=no --windows-console-mode=disable --output-filename=Notepad
+        echo "yes" | python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=1 --lto=no --windows-console-mode=disable --output-filename=Notepad --assume-yes-for-downloads
 
-    # macOS Build - produces Notepad.app
+    # macOS Build - simplified
     - name: Build macOS App Bundle
       if: runner.os == 'macOS'
       run: |
         mkdir -p build
         echo "Starting macOS build..."
-        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=1 --lto=no --macos-create-app-bundle --output-filename=Notepad
+        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=1 --lto=no --output-filename=Notepad
 
-    # Linux Build - produces Notepad executable
+    # Linux Build - simplified
     - name: Build Linux Executable
       if: runner.os == 'Linux'
       run: |
@@ -52,30 +52,75 @@ jobs:
         echo "Starting Linux build..."
         python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=1 --lto=no --output-filename=Notepad
 
-    # Make Linux executable
-    - name: Make Linux Executable
-      if: runner.os == 'Linux'
+    # Post-build steps for macOS
+    - name: Post-process macOS Build
+      if: runner.os == 'macOS'
       run: |
         cd build
-        if [ -f "Notepad" ]; then
-          chmod +x Notepad
-          echo "Linux executable created: Notepad"
-        elif [ -d "Notepad.dist" ]; then
-          chmod +x Notepad.dist/Notepad
-          echo "Linux executable created: Notepad.dist/Notepad"
+        # Check what was actually created
+        echo "=== macOS build contents ==="
+        ls -la
+        # If we have a .dist folder but no .app, create one manually
+        if [ -d "Notepad.dist" ] && [ ! -d "Notepad.app" ]; then
+          echo "Creating macOS app bundle manually..."
+          mkdir -p Notepad.app/Contents/MacOS
+          mkdir -p Notepad.app/Contents/Resources
+          cp -r Notepad.dist/* Notepad.app/Contents/MacOS/
+          # Create Info.plist
+          cat > Notepad.app/Contents/Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>Notepad</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.notepad.app</string>
+              <key>CFBundleName</key>
+              <string>Notepad</string>
+              <key>CFBundleVersion</key>
+              <string>1.0</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
         fi
 
-    # Verify outputs
+    # Make executables
+    - name: Make Executables
+      if: runner.os != 'Windows'
+      run: |
+        cd build
+        echo "=== Build contents ==="
+        ls -la
+        if [ -f "Notepad" ]; then
+          chmod +x Notepad
+          echo "Made Notepad executable"
+        fi
+        if [ -d "Notepad.dist" ] && [ -f "Notepad.dist/Notepad" ]; then
+          chmod +x Notepad.dist/Notepad
+          echo "Made Notepad.dist/Notepad executable"
+        fi
+        if [ -d "Notepad.app" ]; then
+          find Notepad.app -name "Notepad" -exec chmod +x {} \;
+          echo "Made Notepad.app executable"
+        fi
+
+    # Verify and list all outputs
     - name: Verify Build Outputs
       run: |
-        echo "=== Build Outputs for ${{ runner.os }} ==="
+        echo "=== Complete build directory structure ==="
         cd build
-        ls -la 2>/dev/null || echo "Build directory is empty"
-        find . -maxdepth 2 -type f \( -name "Notepad*" -o -name "*.exe" \) 2>/dev/null | head -10
-        find . -maxdepth 2 -type d \( -name "*.app" -o -name "*.dist" \) 2>/dev/null | head -10
+        find . -type f -name "Notepad*" -o -name "*.exe" 2>/dev/null | head -20
+        find . -type d -name "*.app" -o -name "*.dist" 2>/dev/null | head -10
+        echo "=== All files in build/ ==="
+        ls -la
 
-    # Upload artifacts
-    - name: Upload Windows Executable
+    # Upload artifacts - more flexible paths
+    - name: Upload Windows Artifacts
       if: runner.os == 'Windows'
       uses: actions/upload-artifact@v4
       with:
@@ -85,17 +130,18 @@ jobs:
           build/Notepad.dist/
         if-no-files-found: warn
 
-    - name: Upload macOS App Bundle
+    - name: Upload macOS Artifacts
       if: runner.os == 'macOS'
       uses: actions/upload-artifact@v4
       with:
         name: Notepad-macOS
         path: |
-          build/Notepad.app
+          build/Notepad
           build/Notepad.dist/
+          build/Notepad.app/
         if-no-files-found: warn
 
-    - name: Upload Linux Executable
+    - name: Upload Linux Artifacts
       if: runner.os == 'Linux'
       uses: actions/upload-artifact@v4
       with:
@@ -103,4 +149,12 @@ jobs:
         path: |
           build/Notepad
           build/Notepad.dist/
+        if-no-files-found: warn
+
+    # Upload entire build directory as backup
+    - name: Upload Complete Build Directory
+      uses: actions/upload-artifact@v4
+      with:
+        name: Build-Directory-${{ runner.os }}
+        path: build/
         if-no-files-found: warn
