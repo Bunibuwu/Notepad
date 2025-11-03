@@ -1,13 +1,3 @@
-# main.py
-# Notepad (PySide6) — Updated: themes, encoding fixes, always-on-top fix,
-# plus automatic syntax-highlighting for code files.
-#
-# Requirements:
-#   pip install PySide6 qt-themes
-#
-# Put Main.ui, Find.ui, FindNext.ui, FindPrev.ui, Replace.ui, Themes.ui in same folder.
-# Optional: ./themes/ with .qss/.json files.
-
 import sys
 import os
 import json

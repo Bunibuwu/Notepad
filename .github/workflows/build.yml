@@ -32,11 +32,10 @@ jobs:
         with:
           nuitka-version: main
           script-name: main.py
-          mode: standalone             # creates a runnable folder (safer)
-          enable-plugins: pyside6     # ensures PySide6 support
-          # include folder(s) and single files (action supports newline lists)
+          mode: standalone
+          enable-plugins: pyside6
           include-data-dir: |
-            themes=Themes
+            Themes=Themes
           include-data-files: |
             Main.ui=Main.ui
             Find.ui=Find.ui
@@ -45,18 +44,16 @@ jobs:
             Replace.ui=Replace.ui
             Themes.ui=Themes.ui
             settings.json=settings.json
-          extra-args: |
-            --include-qt-plugins=sensible
-            --remove-output
-            --output-dir=build
+          include-qt-plugins: sensible
+          output-dir: build
+          jobs: 2
+          lto: true
+          disable-console: true
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-build
           path: |
-            build/*.exe
-            build/*.bin
-            build/*.app/**/*
-            build/*.dist/**/*
+            build/**
           include-hidden-files: true
