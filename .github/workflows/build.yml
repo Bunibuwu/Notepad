@@ -31,7 +31,7 @@ jobs:
     # Windows-compatible directory creation
     - name: Prepare directories
       run: |
-        if ($IsWindows) {
+        if ("${{ matrix.os }}" -eq "windows-latest") {
           New-Item -ItemType Directory -Force -Path "build", "dist"
         } else {
           mkdir -p build dist
