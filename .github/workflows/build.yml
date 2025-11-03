@@ -1,8 +1,8 @@
-name: Build Notepad (Nuitka)
+name: CI - Build Desktop App (Nuitka)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -13,48 +13,45 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.11
-        cache: pip
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+          cache: pip
 
-    - name: Upgrade pip and install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Upgrade pip and install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Install Nuitka
-      run: python -m pip install --upgrade git+https://github.com/Nuitka/Nuitka.git@main
+      - name: Install Linux build tools
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y ccache
 
-    - name: Install Linux build tools
-      if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get update && sudo apt-get install -y ccache
+      - name: Verify files
+        run: ls -la ${{ github.workspace }}
 
-    - name: Verify files
-      run: ls -la ${{ github.workspace }}
+      - name: Build with Nuitka
+        run: |
+          nuitka \
+            --mode=standalone \
+            --enable-plugins=pyside6 \
+            --script-name="${{ github.workspace }}/main.py" \
+            --include-data-dir="${{ github.workspace }}/Themes=Themes" \
+            --include-data-files="${{ github.workspace }}/Main.ui=Main.ui,${{ github.workspace }}/Find.ui=Find.ui,${{ github.workspace }}/FindNext.ui=FindNext.ui,${{ github.workspace }}/FindPrev.ui=FindPrev.ui,${{ github.workspace }}/Replace.ui=Replace.ui,${{ github.workspace }}/Themes.ui=Themes.ui,${{ github.workspace }}/settings.json=settings.json" \
+            --include-qt-plugins=platforms,styles \
+            --output-dir="${{ github.workspace }}/build" \
+            --jobs=2 \
+            --lto=auto \
+            --disable-console \
+            --assume-yes-for-downloads
 
-    - name: Build with Nuitka
-      run: |
-        nuitka \
-          --mode=standalone \
-          --enable-plugins=pyside6 \
-          --script-name="${{ github.workspace }}/main.py" \
-          --include-data-dir="${{ github.workspace }}/Themes=Themes" \
-          --include-data-files="${{ github.workspace }}/Main.ui=Main.ui,${{ github.workspace }}/Find.ui=Find.ui,${{ github.workspace }}/FindNext.ui=FindNext.ui,${{ github.workspace }}/FindPrev.ui=FindPrev.ui,${{ github.workspace }}/Replace.ui=Replace.ui,${{ github.workspace }}/Themes.ui=Themes.ui,${{ github.workspace }}/settings.json=settings.json" \
-          --include-qt-plugins=platforms,styles \
-          --output-dir="${{ github.workspace }}/build" \
-          --jobs=2 \
-          --lto=auto \
-          --disable-console \
-          --assume-yes-for-downloads
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ runner.os }}-build
-        path: build/**
-        include-hidden-files: true
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-build
+          path: build/**
+          include-hidden-files: true
