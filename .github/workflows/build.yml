@@ -1,71 +1,23 @@
-name: CI - Build Notepad App (Nuitka)
-
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'
-        cache-dependency-path: '**/requirements*.txt'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Install Nuitka
-      run: |
-        python -m pip install nuitka==2.8.5
-
     - name: Build with Nuitka
-      run: |
-        mkdir -p build
-        nuitka main.py \
-          --standalone \
-          --enable-plugin=pyside6 \
-          --include-data-dir=Themes=Themes \
-          --include-data-files=Main.ui=Main.ui,Find.ui=Find.ui,FindNext.ui=FindNext.ui,FindPrev.ui=FindPrev.ui,Replace.ui=Replace.ui,Themes.ui=Themes.ui,settings.json=settings.json \
-          --include-package-data=qt_themes \
-          --include-qt-plugins=sensible \
-          --output-dir=build \
-          --jobs=2 \
-          --lto=auto \
-          --disable-console
-
-    - name: Rename and make executable (Linux/macOS)
-      if: runner.os != 'Windows'
-      run: |
-        cd build
-        if [ -f main ]; then
-          mv main Notepad
-          chmod +x Notepad
-        fi
-
-    - name: Rename Windows executable
-      if: runner.os == 'Windows'
-      run: |
-        cd build
-        if [ -f main.exe ]; then
-          ren main.exe Notepad.exe
-
-    - name: Upload build artifact
-      uses: actions/upload-artifact@v4
+      uses: Nuitka/Nuitka-Action@main
       with:
-        name: ${{ runner.os }}-build
-        path: build/**
-        include-hidden-files: true
+        nuitka-version: main
+        script-name: main.py
+        mode: standalone
+        enable-plugins: pyside6
+        include-data-dir: |
+          Themes=Themes
+        include-data-files: |
+          Main.ui=Main.ui
+          Find.ui=Find.ui
+          FindNext.ui=FindNext.ui
+          FindPrev.ui=FindPrev.ui
+          Replace.ui=Replace.ui
+          Themes.ui=Themes.ui
+          settings.json=settings.json
+        include-package-data: qt_themes
+        include-qt-plugins: sensible
+        output-dir: build
+        jobs: 2
+        lto: auto
+        disable-console: yes
