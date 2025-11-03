@@ -35,10 +35,9 @@ jobs:
           script-name: main.py
           mode: standalone
           enable-plugins: pyside6
-          # Include your custom Themes folder
-          include-data-dir: |
-            Themes=Themes
-          # Include UI files and other required files
+          # Include your Themes folder
+          include-data-dir: Themes=Themes
+          # Include UI and JSON files
           include-data-files: |
             Main.ui=Main.ui
             Find.ui=Find.ui
@@ -47,15 +46,11 @@ jobs:
             Replace.ui=Replace.ui
             Themes.ui=Themes.ui
             settings.json=settings.json
-          # Include required Qt plugins for cross-platform theme support
-          include-qt-plugins: platforms, platformthemes, sensible
-          # Output folder for build artifacts
+          # Qt plugins depending on platform
+          include-qt-plugins: ${{ matrix.os == 'ubuntu-latest' && 'platforms, platformthemes, sensible' || 'platforms, sensible' }}
           output-dir: build
-          # Parallel compilation
           jobs: 2
-          # Link-time optimization
           lto: auto
-          # Disable console on Windows
           disable-console: yes
 
       - name: Upload build artifact
