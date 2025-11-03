@@ -1,4 +1,4 @@
-name: CI - build desktop apps (Nuitka)
+name: CI - Build Notepad (Nuitka)
 
 on:
   push:
@@ -11,11 +11,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-
     steps:
+      # Step 1: Checkout repo
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Step 2: Setup Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -23,40 +24,39 @@ jobs:
           cache: 'pip'
           cache-dependency-path: '**/requirements*.txt'
 
+      # Step 3: Install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # Step 4: Install Nuitka
       - name: Install Nuitka
         run: |
-          python -m pip install --upgrade git+https://github.com/Nuitka/Nuitka.git
+          python -m pip install git+https://github.com/Nuitka/Nuitka.git@main
 
-      - name: Setup system packages (Linux only)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install -y ccache
+      # Step 5: Optional tools for Linux
+      - name: Install Linux build tools
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y ccache
 
+      # Step 6: Build with Nuitka
       - name: Build with Nuitka
         run: |
-          if [ "${{ runner.os }}" == "Linux" ]; then
-            QT_PLUGINS="platforms,platformthemes,styles,sensible"
-          else
-            QT_PLUGINS="platforms,styles"
-          fi
-
           nuitka \
             --mode=standalone \
             --enable-plugins=pyside6 \
             --script-name=main.py \
             --include-data-dir=Themes=Themes \
-            --include-data-files=Main.ui=Main.ui,Find.ui=Find.ui,FindNext.ui=FindNext.ui,FindPrev.ui=FindPrev.ui,Replace.ui=Replace.ui,Themes.ui=Themes.ui,settings.json=settings.json \
-            --include-qt-plugins="$QT_PLUGINS" \
+            --include-data-files="Main.ui=Main.ui,Find.ui=Find.ui,FindNext.ui=FindNext.ui,FindPrev.ui=FindPrev.ui,Replace.ui=Replace.ui,Themes.ui=Themes.ui,settings.json=settings.json" \
+            --include-qt-plugins="platforms,styles" \
             --output-dir=build \
             --jobs=2 \
             --lto=auto \
             --disable-console \
             --assume-yes-for-downloads
 
+      # Step 7: Upload build artifacts
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
