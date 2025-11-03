@@ -1,8 +1,8 @@
-name: CI - Build Desktop App (Nuitka)
+name: CI - build desktop apps (Nuitka)
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -13,45 +13,47 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.11
-          cache: pip
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
 
-      - name: Upgrade pip and install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      - name: Install Linux build tools
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y ccache
+    - name: Build with Nuitka
+      uses: Nuitka/Nuitka-Action@main
+      with:
+        nuitka-version: main
+        script-name: main.py
+        mode: standalone
+        enable-plugins: pyside6
+        include-data-dir: |
+          Themes=Themes
+        include-data-files: |
+          Main.ui=Main.ui
+          Find.ui=Find.ui
+          FindNext.ui=FindNext.ui
+          FindPrev.ui=FindPrev.ui
+          Replace.ui=Replace.ui
+          Themes.ui=Themes.ui
+          settings.json=settings.json
+        include-package-data: qt_themes
+        include-qt-plugins: sensible
+        output-dir: build
+        jobs: 2
+        lto: auto
+        disable-console: yes
 
-      - name: Verify files
-        run: ls -la ${{ github.workspace }}
-
-      - name: Build with Nuitka
-        run: |
-          nuitka \
-            --mode=standalone \
-            --enable-plugins=pyside6 \
-            --script-name="${{ github.workspace }}/main.py" \
-            --include-data-dir="${{ github.workspace }}/Themes=Themes" \
-            --include-data-files="${{ github.workspace }}/Main.ui=Main.ui,${{ github.workspace }}/Find.ui=Find.ui,${{ github.workspace }}/FindNext.ui=FindNext.ui,${{ github.workspace }}/FindPrev.ui=FindPrev.ui,${{ github.workspace }}/Replace.ui=Replace.ui,${{ github.workspace }}/Themes.ui=Themes.ui,${{ github.workspace }}/settings.json=settings.json" \
-            --include-qt-plugins=platforms,styles \
-            --output-dir="${{ github.workspace }}/build" \
-            --jobs=2 \
-            --lto=auto \
-            --disable-console \
-            --assume-yes-for-downloads
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ runner.os }}-build
-          path: build/**
-          include-hidden-files: true
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ runner.os }}-build
+        path: build/**
+        include-hidden-files: true
