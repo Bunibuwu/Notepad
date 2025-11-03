@@ -1,4 +1,4 @@
-name: CI - Build Desktop Apps (Nuitka)
+name: CI - build desktop apps (Nuitka)
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -28,30 +28,34 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Install Nuitka
+        run: |
+          python -m pip install --upgrade git+https://github.com/Nuitka/Nuitka.git
+
+      - name: Setup system packages (Linux only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y ccache
+
       - name: Build with Nuitka
-        uses: Nuitka/Nuitka-Action@main
-        with:
-          nuitka-version: main
-          script-name: main.py
-          mode: standalone
-          enable-plugins: pyside6
-          # Include your Themes folder
-          include-data-dir: Themes=Themes
-          # Include UI and JSON files
-          include-data-files: |
-            Main.ui=Main.ui
-            Find.ui=Find.ui
-            FindNext.ui=FindNext.ui
-            FindPrev.ui=FindPrev.ui
-            Replace.ui=Replace.ui
-            Themes.ui=Themes.ui
-            settings.json=settings.json
-          # Qt plugins depending on platform
-          include-qt-plugins: ${{ matrix.os == 'ubuntu-latest' && 'platforms, platformthemes, sensible' || 'platforms, sensible' }}
-          output-dir: build
-          jobs: 2
-          lto: auto
-          disable-console: yes
+        run: |
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            QT_PLUGINS="platforms,platformthemes,styles,sensible"
+          else
+            QT_PLUGINS="platforms,styles"
+          fi
+
+          nuitka \
+            --mode=standalone \
+            --enable-plugins=pyside6 \
+            --script-name=main.py \
+            --include-data-dir=Themes=Themes \
+            --include-data-files=Main.ui=Main.ui,Find.ui=Find.ui,FindNext.ui=FindNext.ui,FindPrev.ui=FindPrev.ui,Replace.ui=Replace.ui,Themes.ui=Themes.ui,settings.json=settings.json \
+            --include-qt-plugins="$QT_PLUGINS" \
+            --output-dir=build \
+            --jobs=2 \
+            --lto=auto \
+            --disable-console \
+            --assume-yes-for-downloads
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
