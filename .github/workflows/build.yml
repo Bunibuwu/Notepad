@@ -8,7 +8,11 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,11 +27,26 @@ jobs:
           pip install pyinstaller
 
       - name: Build with PyInstaller
+        shell: bash
         run: |
           mkdir -p build
-          pyinstaller --onefile --windowed --name Notepad \
-            --add-data "Themes;Themes" \
-            --add-data "*.ui;." \
-            --add-data "settings.json;." \
-            main.py
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            pyinstaller --onefile --windowed --name Notepad `
+              --add-data "Themes;Themes" `
+              --add-data "*.ui;." `
+              --add-data "settings.json;." `
+              main.py
+          else
+            pyinstaller --onefile --windowed --name Notepad \
+              --add-data "Themes:Themes" \
+              --add-data "*.ui:." \
+              --add-data "settings.json:." \
+              main.py
+          fi
           cp dist/Notepad* build/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Notepad-${{ matrix.os }}
+          path: build/
