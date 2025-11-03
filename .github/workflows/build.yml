@@ -11,7 +11,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
     - name: Checkout
@@ -23,61 +23,61 @@ jobs:
         python-version: '3.11'
         cache: 'pip'
 
-    - name: Cache pip packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
     - name: Build with Nuitka
-      run: |
-        mkdir -p build
-        
-        # Common Nuitka arguments
-        NUITKA_ARGS=""
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          NUITKA_ARGS="--windows-console-mode=disable"
-        fi
-        
-        python -m nuitka main.py \
-          --standalone \
-          --enable-plugin=pyside6 \
-          --include-data-dir=Themes=Themes \
-          --include-data-files=Main.ui=Main.ui \
-          --include-data-files=Find.ui=Find.ui \
-          --include-data-files=FindNext.ui=FindNext.ui \
-          --include-data-files=FindPrev.ui=FindPrev.ui \
-          --include-data-files=Replace.ui=Replace.ui \
-          --include-data-files=Themes.ui=Themes.ui \
-          --include-data-files=settings.json=settings.json \
-          --include-package-data=qt_themes \
-          --include-qt-plugins=sensible \
-          --output-dir=build \
-          --jobs=2 \
-          --lto=yes \
-          --output-filename=Notepad \
-          $NUITKA_ARGS
+      uses: Nuitka/Nuitka-Action@main
+      with:
+        nuitka-version: main
+        script-name: main.py
+        mode: standalone
+        enable-plugins: pyside6
+        include-data-dir: |
+          Themes=Themes
+        include-data-files: |
+          Main.ui=.
+          Find.ui=.
+          FindNext.ui=.
+          FindPrev.ui=.
+          Replace.ui=.
+          Themes.ui=.
+          settings.json=.
+        include-package-data: qt_themes
+        include-qt-plugins: sensible
+        output-dir: build
+        jobs: 2
+        lto: yes
+        windows-console-mode: disable
+        onefile: false
 
-    - name: Make executable (Linux/macOS)
-      if: runner.os != 'Windows'
+    - name: Rename executable to Notepad
       run: |
         cd build
-        if [ -f Notepad ]; then
-          chmod +x Notepad
-        elif [ -d Notepad.dist ]; then
-          chmod +x Notepad.dist/Notepad
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          if [ -f "main.exe" ]; then
+            mv main.exe Notepad.exe
+          fi
+        else
+          if [ -f "main" ]; then
+            mv main Notepad
+            chmod +x Notepad
+          fi
+          if [ -d "main.dist" ]; then
+            mv main.dist Notepad.dist
+            chmod +x Notepad.dist/main 2>/dev/null || true
+            # Try to rename the inner executable too
+            if [ -f "Notepad.dist/main" ]; then
+              mv Notepad.dist/main Notepad.dist/Notepad 2>/dev/null || true
+            fi
+          fi
         fi
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ runner.os }}-Notepad
+        name: Notepad-${{ runner.os }}
         path: build/
         if-no-files-found: error
