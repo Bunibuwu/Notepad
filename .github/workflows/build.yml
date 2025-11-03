@@ -11,55 +11,58 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+
     steps:
-      # Step 1: Checkout repo
-      - name: Checkout
-        uses: actions/checkout@v4
+    # Step 1: Checkout repo
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      # Step 2: Setup Python
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: '**/requirements*.txt'
+    # Step 2: Setup Python
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.11
+        cache: pip
 
-      # Step 3: Install dependencies
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+    # Step 3: Install dependencies
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      # Step 4: Install Nuitka
-      - name: Install Nuitka
-        run: |
-          python -m pip install git+https://github.com/Nuitka/Nuitka.git@main
+    # Step 4: Install Nuitka latest
+    - name: Install Nuitka
+      run: python -m pip install git+https://github.com/Nuitka/Nuitka.git@main
 
-      # Step 5: Optional tools for Linux
-      - name: Install Linux build tools
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y ccache
+    # Step 5: Linux build tools
+    - name: Install Linux tools
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt-get update && sudo apt-get install -y ccache
 
-      # Step 6: Build with Nuitka
-      - name: Build with Nuitka
-        run: |
-          nuitka \
-            --mode=standalone \
-            --enable-plugins=pyside6 \
-            --script-name=main.py \
-            --include-data-dir=Themes=Themes \
-            --include-data-files="Main.ui=Main.ui,Find.ui=Find.ui,FindNext.ui=FindNext.ui,FindPrev.ui=FindPrev.ui,Replace.ui=Replace.ui,Themes.ui=Themes.ui,settings.json=settings.json" \
-            --include-qt-plugins="platforms,styles" \
-            --output-dir=build \
-            --jobs=2 \
-            --lto=auto \
-            --disable-console \
-            --assume-yes-for-downloads
+    # Step 6: Build with Nuitka
+    - name: Build with Nuitka
+      run: |
+        # Ensure paths exist
+        ls -la
 
-      # Step 7: Upload build artifacts
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ runner.os }}-build
-          path: build/**
-          include-hidden-files: true
+        # Build command
+        nuitka \
+          --mode=standalone \
+          --enable-plugins=pyside6 \
+          --script-name=main.py \
+          --include-data-dir=Themes=Themes \
+          --include-data-files="Main.ui=Main.ui,Find.ui=Find.ui,FindNext.ui=FindNext.ui,FindPrev.ui=FindPrev.ui,Replace.ui=Replace.ui,Themes.ui=Themes.ui,settings.json=settings.json" \
+          --include-qt-plugins=platforms,styles \
+          --output-dir=build \
+          --jobs=2 \
+          --lto=auto \
+          --disable-console \
+          --assume-yes-for-downloads
+
+    # Step 7: Upload build artifact
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ runner.os }}-build
+        path: build/**
+        include-hidden-files: true
