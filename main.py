@@ -10,20 +10,22 @@ from PySide6.QtWidgets import (
     QDialogButtonBox, QLabel, QLineEdit, QHBoxLayout, QPushButton, QStatusBar, QInputDialog
 )
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtCore import QFile, Qt, QSize, QEvent, QRegularExpression
+from PySide6.QtCore import QFile, Qt, QSize, QEvent, QRegularExpression, QObject
 from PySide6.QtGui import QMouseEvent, QTextCursor, QIcon, QFont, QSyntaxHighlighter, QTextCharFormat, QColor, QAction
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 import qt_themes  # pip install qt-themes
 
 # Config / paths
 SETTINGS_FILE = "settings.json"
-THEMES_FOLDER = "themes"
+THEMES_FOLDER = "Themes"  # capital T — match repo folder
 HERE = Path(__file__).parent
+
 
 def resource_path(relative_path):
     if getattr(sys, "frozen", False):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.abspath(os.path.join(HERE, relative_path))
+
 
 # ------------------ Syntax highlighter ------------------
 class CodeHighlighter(QSyntaxHighlighter):
@@ -59,8 +61,8 @@ class CodeHighlighter(QSyntaxHighlighter):
 
     def _build_rules(self):
         # common formats
-        kw_fmt = self._fmt("#569CD6", bold=True)       # keywords
-        type_fmt = self._fmt("#4EC9B0", bold=True)     # types
+        kw_fmt = self._fmt("#569CD6", bold=True)  # keywords
+        type_fmt = self._fmt("#4EC9B0", bold=True)  # types
         num_fmt = self._fmt("#B5CEA8")
         str_fmt = self._fmt("#CE9178")
         comment_fmt = self._fmt("#6A9955", italic=True)
@@ -73,11 +75,11 @@ class CodeHighlighter(QSyntaxHighlighter):
 
         if lang in ("python",):
             keywords = [
-                "and","as","assert","break","class","continue","def","del","elif","else","except",
-                "False","finally","for","from","global","if","import","in","is","lambda","None",
-                "nonlocal","not","or","pass","raise","return","True","try","while","with","yield"
+                "and", "as", "assert", "break", "class", "continue", "def", "del", "elif", "else", "except",
+                "False", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "None",
+                "nonlocal", "not", "or", "pass", "raise", "return", "True", "try", "while", "with", "yield"
             ]
-            types = ["int","float","str","list","dict","set","tuple","bool","bytes"]
+            types = ["int", "float", "str", "list", "dict", "set", "tuple", "bool", "bytes"]
             self._add_rule(self._word_pattern(keywords), kw_fmt)
             self._add_rule(self._word_pattern(types), type_fmt)
             # functions (simple heuristic)
@@ -93,11 +95,11 @@ class CodeHighlighter(QSyntaxHighlighter):
         elif lang in ("cpp", "c", "c++", "cxx", "h", "hpp", "cc", "c++-header", "c-header", "java", "csharp", "c#"):
             # treat C-like languages together
             keywords = [
-                "if","else","switch","case","for","while","do","break","continue","return",
-                "class","struct","public","private","protected","virtual","override","static",
-                "constexpr","template","typename","using","namespace","new","delete","try","catch","throw"
+                "if", "else", "switch", "case", "for", "while", "do", "break", "continue", "return",
+                "class", "struct", "public", "private", "protected", "virtual", "override", "static",
+                "constexpr", "template", "typename", "using", "namespace", "new", "delete", "try", "catch", "throw"
             ]
-            types = ["int","long","short","float","double","char","bool","void","size_t","auto"]
+            types = ["int", "long", "short", "float", "double", "char", "bool", "void", "size_t", "auto"]
             self._add_rule(self._word_pattern(keywords), kw_fmt)
             self._add_rule(self._word_pattern(types), type_fmt)
             self._add_rule(r"\b[A-Za-z_]\w*(?=\s*\()", func_fmt)
@@ -111,8 +113,9 @@ class CodeHighlighter(QSyntaxHighlighter):
 
         elif lang in ("javascript", "js", "typescript", "ts", "jsx", "tsx"):
             keywords = [
-                "var","let","const","if","else","for","while","do","switch","case","break","continue",
-                "function","return","class","extends","import","from","export","new","try","catch","finally","await","async"
+                "var", "let", "const", "if", "else", "for", "while", "do", "switch", "case", "break", "continue",
+                "function", "return", "class", "extends", "import", "from", "export", "new", "try", "catch", "finally",
+                "await", "async"
             ]
             self._add_rule(self._word_pattern(keywords), kw_fmt)
             self._add_rule(r"\b[A-Za-z_]\w*(?=\s*\()", func_fmt)
@@ -125,8 +128,9 @@ class CodeHighlighter(QSyntaxHighlighter):
 
         elif lang in ("php",):
             keywords = [
-                "echo","array","function","if","else","foreach","for","while","return","class","public","private","protected",
-                "namespace","use","new","try","catch","finally","throw"
+                "echo", "array", "function", "if", "else", "foreach", "for", "while", "return", "class", "public",
+                "private", "protected",
+                "namespace", "use", "new", "try", "catch", "finally", "throw"
             ]
             self._add_rule(r"<\?php|<\?|/\*|\*/|\?>", comment_fmt)  # basic PHP tags detection as markup
             self._add_rule(self._word_pattern(keywords), kw_fmt)
@@ -194,13 +198,15 @@ class CodeHighlighter(QSyntaxHighlighter):
                     endIndex = endMatch.capturedEnd()
                     length = endIndex - startIndex
                     self.setFormat(startIndex, length, fmt)
-                    startIndex = startExpr.match(text, endIndex).capturedStart() if startExpr.match(text, endIndex).hasMatch() else -1
+                    startIndex = startExpr.match(text, endIndex).capturedStart() if startExpr.match(text,
+                                                                                                    endIndex).hasMatch() else -1
                     self.setCurrentBlockState(0)
                 else:
                     # comment continues to next block
                     self.setFormat(startIndex, len(text) - startIndex, fmt)
                     self.setCurrentBlockState(1)
                     startIndex = -1
+
 
 # helper to map extension -> language and attach highlighter
 def apply_syntax_highlighting(editor: QPlainTextEdit, filepath: str):
@@ -254,6 +260,28 @@ def apply_syntax_highlighting(editor: QPlainTextEdit, filepath: str):
         # safe fallback: ignore failures
         pass
 
+
+# FIX: Custom QPlainTextEdit with proper Ctrl+Wheel zoom handling
+class ZoomablePlainTextEdit(QPlainTextEdit):
+    def __init__(self, app, parent=None):
+        super().__init__(parent)
+        self.app = app
+
+    def wheelEvent(self, event):
+        # Check if Ctrl is held - handle zoom
+        if event.modifiers() & Qt.ControlModifier:
+            delta = event.angleDelta().y()
+            if delta > 0:
+                self.app.zoom_in_editor(self)
+            else:
+                self.app.zoom_out_editor(self)
+            # Accept the event to prevent any scroll handling
+            event.accept()
+            return
+        # Normal scroll behavior when Ctrl not held
+        super().wheelEvent(event)
+
+
 # ---------- Tabs ----------
 class ModernTabBar(QTabBar):
     def tabSizeHint(self, index):
@@ -273,6 +301,7 @@ class ModernTabBar(QTabBar):
                 self.parent_widget.close_tab(idx)
             return
         super().mouseReleaseEvent(event)
+
 
 class ModernTabWidget(QTabWidget):
     def __init__(self, app):
@@ -299,10 +328,11 @@ class ModernTabWidget(QTabWidget):
         cont = QWidget()
         layout = QVBoxLayout(cont)
         layout.setContentsMargins(2, 2, 2, 2)
-        editor = QPlainTextEdit()
+        # FIX: Use ZoomablePlainTextEdit instead of QPlainTextEdit
+        editor = ZoomablePlainTextEdit(self.app)
         editor.setPlainText(str(text))
         editor.setFont(QFont("Consolas", 11))
-        editor.installEventFilter(self.app)
+
         try:
             editor.cursorPositionChanged.connect(lambda: self.app.update_status(editor))
         except Exception:
@@ -345,8 +375,10 @@ class ModernTabWidget(QTabWidget):
         self.app.update_status(ed)
         self.app.update_window_title(index)
 
+
 # ---------- UI loader / dialog helpers ----------
 loader = QUiLoader()
+
 
 def load_ui(path, parent=None):
     f = QFile(str(path))
@@ -357,6 +389,7 @@ def load_ui(path, parent=None):
     if w is None:
         raise RuntimeError(f"QUiLoader failed to load {path}")
     return w
+
 
 class DialogLoader:
     def __init__(self, parent, loader: QUiLoader):
@@ -370,7 +403,8 @@ class DialogLoader:
             if f.open(QFile.ReadOnly):
                 dlg = self.loader.load(f, self.parent)
                 f.close()
-                combo = dlg.findChild(QComboBox, "TcomboBox") or dlg.findChild(QComboBox, "comboBox") or dlg.findChild(QComboBox)
+                combo = dlg.findChild(QComboBox, "TcomboBox") or dlg.findChild(QComboBox, "comboBox") or dlg.findChild(
+                    QComboBox)
                 return dlg, combo
         # fallback
         dlg = QDialog(self.parent)
@@ -401,22 +435,8 @@ class DialogLoader:
                     if len(edits) >= 2:
                         find_edit, with_edit = edits[0], edits[1]
                 return dlg, find_edit, with_edit
-        # fallback
-        dlg = QDialog(self.parent)
-        find_edit = QLineEdit()
-        with_edit = QLineEdit()
-        box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        form = QHBoxLayout()
-        form.addWidget(QLabel("Find:"))
-        form.addWidget(find_edit)
-        form.addWidget(QLabel("With:"))
-        form.addWidget(with_edit)
-        v = QVBoxLayout(dlg)
-        v.addLayout(form)
-        v.addWidget(box)
-        box.accepted.connect(dlg.accept)
-        box.rejected.connect(dlg.reject)
-        return dlg, find_edit, with_edit
+        # fallback (we will often use our custom dialog instead)
+        return None, None, None
 
     def load_find_dialog(self, ui_name="Find.ui"):
         ui_path = resource_path(ui_name)
@@ -429,12 +449,14 @@ class DialogLoader:
                 return dlg, le
         return None, None
 
+
 # ---------- Main app ----------
 class NotepadApp(QApplication):
     def __init__(self, argv):
         super().__init__(argv)
         self.loader = loader
         self.dialogs = DialogLoader(None, loader)
+
         # encoding default
         self.current_theme = "atom_one"
         self.current_encoding = "UTF-8"
@@ -472,7 +494,8 @@ class NotepadApp(QApplication):
                 central.layout().addWidget(self.tab_widget)
 
         # statusbar & permanent labels
-        self.statusbar = getattr(self.window, "statusbar", None) or self.window.findChild(QStatusBar) or self.window.statusBar()
+        self.statusbar = getattr(self.window, "statusbar", None) or self.window.findChild(
+            QStatusBar) or self.window.statusBar()
         if self.statusbar is None:
             self.statusbar = QStatusBar()
             try:
@@ -482,13 +505,18 @@ class NotepadApp(QApplication):
 
         self.lbl_left = QLabel("Ln:1 Col:1 Ch:0")
         self.lbl_zoom = QLabel("100%")
-        self.lbl_enc = QLabel(self.current_encoding)  # no checkmark
+        self.lbl_enc = QLabel(self.current_encoding)
         self.statusbar.addWidget(self.lbl_left, 1)
         self.statusbar.addPermanentWidget(self.lbl_zoom)
         self.statusbar.addPermanentWidget(self.lbl_enc)
 
         # wire actions / features
         self.connect_actions()
+
+        # drag & drop
+        self.window.setAcceptDrops(True)
+        self.window.dragEnterEvent = self.dragEnterEvent
+        self.window.dropEvent = self.dropEvent
 
         # start with one tab
         self.tab_widget.insert_new_tab()
@@ -497,6 +525,20 @@ class NotepadApp(QApplication):
 
         # ensure encoding label reflects loaded value
         self.lbl_enc.setText(self.current_encoding)
+
+    # drag & drop handling
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        for url in event.mimeData().urls():
+            if url.isLocalFile():
+                path = url.toLocalFile()
+                if os.path.isfile(path):
+                    self._load_file_into_tab(path)
+                    break
+        event.acceptProposedAction()
 
     # settings persistence
     def load_settings(self):
@@ -507,7 +549,6 @@ class NotepadApp(QApplication):
                     self.current_theme = data.get("theme", self.current_theme)
                     self.current_encoding = data.get("encoding", self.current_encoding)
         except Exception:
-            # keep defaults on failure
             pass
 
     def save_settings(self):
@@ -517,10 +558,9 @@ class NotepadApp(QApplication):
         except Exception:
             pass
 
-    # theme application (clears stylesheet prior to builtin apply)
+    # theme application
     def apply_theme(self, theme_name):
-        self.setStyleSheet("")  # clear first
-        # try local file (exact name or name.qss)
+        self.setStyleSheet("")
         local_file = Path(THEMES_FOLDER) / theme_name
         local_qss = Path(THEMES_FOLDER) / f"{theme_name}.qss"
         if local_file.exists() and local_file.suffix.lower() == ".qss":
@@ -537,14 +577,22 @@ class NotepadApp(QApplication):
                     return True
             except Exception:
                 pass
-        # fallback to qt_themes - will style via palette/qt style
         try:
             qt_themes.set_theme(theme_name)
             return True
         except Exception:
+            try:
+                import qt_themes as _qt
+                pkg_dir = Path(_qt.__file__).parent
+                candidates = list(pkg_dir.rglob(f"*{theme_name}*.qss"))
+                if candidates:
+                    with open(candidates[0], "r", encoding="utf-8") as fh:
+                        self.setStyleSheet(fh.read())
+                        return True
+            except Exception:
+                pass
             return False
 
-    # helper: find encoding-related QAction objects robustly
     def _find_encoding_actions(self):
         acts = []
         for act in self.window.findChildren(QAction):
@@ -552,7 +600,6 @@ class NotepadApp(QApplication):
                 continue
             name = (act.objectName() or "").lower()
             text = (act.text() or "").lower()
-            # consider actions whose objectName or text mentions utf
             if "utf" in name or "utf" in text:
                 acts.append(act)
         return acts
@@ -560,7 +607,9 @@ class NotepadApp(QApplication):
     # connect actions
     def connect_actions(self):
         w = self.window
-        def a(name): return w.findChild(QAction, name)
+
+        def a(name):
+            return w.findChild(QAction, name)
 
         # File
         if a("actionNew"): a("actionNew").triggered.connect(lambda: self.tab_widget.insert_new_tab())
@@ -583,7 +632,7 @@ class NotepadApp(QApplication):
         if a("actionZoom_Out"): a("actionZoom_Out").triggered.connect(lambda: self.zoom_out_current(1))
         if a("actionReset_Zoom"): a("actionReset_Zoom").triggered.connect(self.reset_zoom)
 
-        # Settings / Themes & Encoding
+        # Settings / Themes
         settings_action = w.findChild(QAction, "actionSettings") or w.findChild(QAction, "actionThemes")
         if settings_action is None:
             settings_action = QAction("Themes", self.window)
@@ -597,7 +646,7 @@ class NotepadApp(QApplication):
         else:
             settings_action.triggered.connect(self.open_settings)
 
-        # Encoding actions — robust detection instead of brittle mapping
+        # Encoding actions
         enc_actions = self._find_encoding_actions()
         for act in enc_actions:
             try:
@@ -605,21 +654,16 @@ class NotepadApp(QApplication):
             except Exception:
                 pass
 
-            # determine a friendly encoding name from QAction text or objectName
             enc_text = (act.text() or "").strip()
             if not enc_text:
-                # fallback: infer from objectName (remove 'action' and underscores)
                 enc_text = act.objectName().replace("action", "").replace("_", "-").strip()
-            # ensure display text isn't empty
             enc_text = enc_text or "UTF-8"
 
-            # connect; use default arg to capture act/enc_text properly
             try:
                 act.triggered.connect(lambda checked, e=enc_text: self.set_encoding(e))
             except Exception:
                 pass
 
-        # set initial encoding check state based on loaded settings
         self._sync_encoding_action_checks()
 
         # fullscreen & always-on-top
@@ -636,35 +680,30 @@ class NotepadApp(QApplication):
             enc_text = (act.text() or "").strip()
             if not enc_text:
                 enc_text = act.objectName().replace("action", "").replace("_", "-").strip()
-            # normalize simple differences like underscores
             try:
                 act.setChecked(enc_text == self.current_encoding)
             except Exception:
-                # fallback: try case-insensitive compare
                 try:
                     act.setChecked(enc_text.lower() == self.current_encoding.lower())
                 except Exception:
                     pass
-        # update status label (no checkmark)
         try:
             self.lbl_enc.setText(self.current_encoding)
         except Exception:
             pass
 
-    # themes dialog (applies selected theme and closes properly)
     def open_settings(self):
         dlg, combo = self.dialogs.load_settings_dialog()
         if combo is None:
-            QMessageBox.information(self.window, "Themes", "Themes UI missing comboBox widget named 'comboBox' or 'TcomboBox'.")
+            QMessageBox.information(self.window, "Themes",
+                                    "Themes UI missing comboBox widget.")
             return
 
-        # prepare theme list — builtin names + qt_themes list + local files (.qss/.json)
         themes = []
         try:
             themes = list(qt_themes.list_themes())
         except Exception:
             themes = []
-        # ensure defaults present
         builtin_defaults = [
             "one_dark_two", "monokai", "nord",
             "catppuccin_latte", "catppuccin_frappe", "catppuccin_macchiato", "catppuccin_mocha",
@@ -673,7 +712,6 @@ class NotepadApp(QApplication):
         for d in builtin_defaults:
             if d not in themes:
                 themes.append(d)
-        # add local files by filename
         if os.path.isdir(THEMES_FOLDER):
             for f in sorted(os.listdir(THEMES_FOLDER)):
                 if f.lower().endswith((".qss", ".json")) and f not in themes:
@@ -681,7 +719,6 @@ class NotepadApp(QApplication):
 
         combo.clear()
         combo.addItems(themes)
-        # ensure current_theme selection visible (if present)
         idx = combo.findText(self.current_theme)
         if idx >= 0:
             combo.setCurrentIndex(idx)
@@ -694,13 +731,11 @@ class NotepadApp(QApplication):
                 self._apply_chosen_theme(chosen)
             return
 
-        # Disconnect the .ui's accepted -> dlg.accept (if it exists) so we can control closing
         try:
             bb.accepted.disconnect()
         except Exception:
             pass
 
-        # get the Ok button — connect to apply+close
         ok_btn = bb.button(QDialogButtonBox.Ok)
         if ok_btn:
             try:
@@ -711,11 +746,10 @@ class NotepadApp(QApplication):
             def on_ok_clicked():
                 chosen = combo.currentText()
                 self._apply_chosen_theme(chosen)
-                dlg.accept()  # now close the themes dialog after applying
+                dlg.accept()
 
             ok_btn.clicked.connect(on_ok_clicked)
 
-        # make sure Cancel closes
         cancel_btn = bb.button(QDialogButtonBox.Cancel)
         if cancel_btn:
             try:
@@ -730,7 +764,6 @@ class NotepadApp(QApplication):
     def _apply_chosen_theme(self, chosen):
         if not chosen:
             return
-        # if selection is a local filename -> load from THEMES_FOLDER
         if "." in chosen:
             p = Path(THEMES_FOLDER) / chosen
             if p.exists() and p.suffix.lower() == ".qss":
@@ -745,13 +778,13 @@ class NotepadApp(QApplication):
                     QMessageBox.warning(self.window, "Theme", f"Failed to apply theme file {chosen}")
                     return
             elif p.exists() and p.suffix.lower() == ".json":
-                QMessageBox.information(self.window, "Theme", f"'{chosen}' is a JSON theme — not applied automatically.")
+                QMessageBox.information(self.window, "Theme",
+                                        f"'{chosen}' is a JSON theme — not applied automatically.")
                 return
             else:
-                QMessageBox.warning(self.window, "Theme", f"Theme file {chosen} not found in {THEMES_FOLDER}")
+                QMessageBox.warning(self.window, "Theme", f"Theme file {chosen} not found")
                 return
 
-        # builtin name: try local qss first, else qt_themes (we clear stylesheet inside apply_theme)
         local_qss = Path(THEMES_FOLDER) / f"{chosen}.qss"
         if local_qss.exists():
             try:
@@ -764,7 +797,6 @@ class NotepadApp(QApplication):
             except Exception:
                 pass
 
-        # try qt_themes
         applied = self.apply_theme(chosen)
         if applied:
             self.current_theme = chosen
@@ -772,13 +804,13 @@ class NotepadApp(QApplication):
             self.show_status(f"Applied builtin theme {chosen}")
             return
 
-        # fallback: ask user to pick qss
         ans = QMessageBox.question(self.window, "Theme not found",
-                                   f"Builtin theme '{chosen}' isn't available locally or via qt_themes.\nSelect a .qss file to apply?",
+                                   f"Builtin theme '{chosen}' isn't available.\nSelect a .qss file?",
                                    QMessageBox.Yes | QMessageBox.No)
         if ans != QMessageBox.Yes:
             return
-        qpath, _ = QFileDialog.getOpenFileName(self.window, "Select .qss for theme", str(HERE), "Style Sheets (*.qss);;All Files (*)")
+        qpath, _ = QFileDialog.getOpenFileName(self.window, "Select .qss", str(HERE),
+                                               "Style Sheets (*.qss);;All Files (*)")
         if not qpath:
             return
         try:
@@ -792,36 +824,45 @@ class NotepadApp(QApplication):
             self.save_settings()
             self.show_status(f"Applied theme from {qpath}")
         except Exception as e:
-            QMessageBox.warning(self.window, "Theme", f"Failed to apply selected qss: {e}")
+            QMessageBox.warning(self.window, "Theme", f"Failed to apply qss: {e}")
 
-    # Replace (cursor-based, undoable) — keep dialog open and don't call dlg.accept by default
     def replace_text(self):
-        dlg, find_edit, with_edit = self.dialogs.load_replace_dialog()
-        if dlg is None or find_edit is None or with_edit is None:
-            return
+        ui_dlg, ui_find, ui_with = self.dialogs.load_replace_dialog()
+
+        dlg = QDialog(self.window)
         dlg.setWindowTitle("Replace")
-        bb = dlg.findChild(QDialogButtonBox, "buttonBox")
-        if bb:
-            # try to disconnect any accepted->dlg.accept
+        find_le = QLineEdit()
+        rep_le = QLineEdit()
+        if ui_find and ui_with:
             try:
-                bb.accepted.disconnect()
+                find_le.setText(ui_find.text())
+                rep_le.setText(ui_with.text())
             except Exception:
                 pass
-            ok_btn = bb.button(QDialogButtonBox.Ok)
-            if ok_btn:
-                try:
-                    ok_btn.clicked.disconnect()
-                except Exception:
-                    pass
-                ok_btn.clicked.connect(lambda: self._do_replace_dialog(find_edit, with_edit))
-            # make cancel close
-            cancel_btn = bb.button(QDialogButtonBox.Cancel)
-            if cancel_btn:
-                try:
-                    cancel_btn.clicked.disconnect()
-                except Exception:
-                    pass
-                cancel_btn.clicked.connect(dlg.reject)
+
+        replace_btn = QPushButton("Replace")
+        replace_all_btn = QPushButton("Replace All")
+        close_btn = QPushButton("Close")
+
+        form = QHBoxLayout()
+        form.addWidget(QLabel("Find:"))
+        form.addWidget(find_le)
+        form.addWidget(QLabel("With:"))
+        form.addWidget(rep_le)
+
+        btns = QHBoxLayout()
+        btns.addWidget(replace_btn)
+        btns.addWidget(replace_all_btn)
+        btns.addWidget(close_btn)
+
+        v = QVBoxLayout(dlg)
+        v.addLayout(form)
+        v.addLayout(btns)
+
+        replace_btn.clicked.connect(lambda: self._do_replace_dialog(find_le, rep_le))
+        replace_all_btn.clicked.connect(lambda: self._do_replace_all(find_le, rep_le))
+        close_btn.clicked.connect(dlg.reject)
+
         dlg.exec()
 
     def _do_replace_dialog(self, find_le, rep_le):
@@ -832,26 +873,64 @@ class NotepadApp(QApplication):
         ed = self.tab_widget.get_editor()
         if not ed:
             return
+
         cursor = ed.textCursor()
         if cursor.hasSelection() and cursor.selectedText() == find_text:
             cursor.insertText(rep_text)
             ed.setTextCursor(cursor)
+            if not ed.find(find_text):
+                tmp = ed.textCursor()
+                tmp.movePosition(QTextCursor.Start)
+                ed.setTextCursor(tmp)
+                if not ed.find(find_text):
+                    QMessageBox.information(self.window, "Replace", f"No more occurrences of '{find_text}'")
             return
-        found = ed.find(find_text)
-        if found:
+
+        if ed.find(find_text):
             c = ed.textCursor()
             c.insertText(rep_text)
-            ed.setTextCursor(c)
-        else:
-            QMessageBox.information(self.window, "Replace", f"'{find_text}' not found")
+            if not ed.find(find_text):
+                tmp = ed.textCursor()
+                tmp.movePosition(QTextCursor.Start)
+                ed.setTextCursor(tmp)
+                if not ed.find(find_text):
+                    QMessageBox.information(self.window, "Replace", f"No more occurrences of '{find_text}'")
+            return
 
-    # open/save
+        QMessageBox.information(self.window, "Replace", f"'{find_text}' not found")
+
+    def _do_replace_all(self, find_le, rep_le):
+        find_text = find_le.text()
+        rep_text = rep_le.text()
+        if not find_text:
+            return
+        ed = self.tab_widget.get_editor()
+        if not ed:
+            return
+
+        cursor = ed.textCursor()
+        cursor.movePosition(QTextCursor.Start)
+        ed.setTextCursor(cursor)
+        replaced_any = False
+        while ed.find(find_text):
+            c = ed.textCursor()
+            c.insertText(rep_text)
+            replaced_any = True
+
+        if not replaced_any:
+            QMessageBox.information(self.window, "Replace All", f"No occurrences of '{find_text}' found")
+        else:
+            QMessageBox.information(self.window, "Replace All", "Replace All complete")
+
     def open_file(self):
-        path, _ = QFileDialog.getOpenFileName(self.window, "Open File", str(HERE), "Text Files (*.txt *.py *.cpp *.c *.h *.js *.java *.php *.html);;All Files (*)")
+        path, _ = QFileDialog.getOpenFileName(self.window, "Open File", str(HERE),
+                                              "Text Files (*.txt *.py *.cpp *.c *.h *.js *.java *.php *.html);;All Files (*)")
         if not path:
             return
+        self._load_file_into_tab(path)
+
+    def _load_file_into_tab(self, path):
         try:
-            # try to read using UTF-8, but fallback to system default if fails
             try:
                 with open(path, "r", encoding="utf-8") as fh:
                     content = fh.read()
@@ -871,7 +950,6 @@ class NotepadApp(QApplication):
                 w.setProperty("filepath", path)
                 self.tab_widget.setTabText(i, os.path.basename(path))
                 self.tab_widget.setCurrentIndex(i)
-                # apply syntax highlighting based on extension
                 apply_syntax_highlighting(ed, path)
                 replaced = True
                 break
@@ -894,7 +972,6 @@ class NotepadApp(QApplication):
         if not path:
             return self.save_file_as(index)
         try:
-            # always write as utf-8 (you can change this later to respect current_encoding)
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(ed.toPlainText())
             ed.document().setModified(False)
@@ -919,7 +996,6 @@ class NotepadApp(QApplication):
             w.setProperty("filepath", path)
             self.tab_widget.setTabText(index, os.path.basename(path))
             ed.document().setModified(False)
-            # apply syntax if saved as a code file
             apply_syntax_highlighting(ed, path)
             self.show_status(f"Saved as {os.path.basename(path)}")
             self.update_window_title(index)
@@ -930,7 +1006,6 @@ class NotepadApp(QApplication):
         for i in range(self.tab_widget.count() - 1):
             self.save_file(i)
 
-    # Find / Next / Prev — search from current cursor, wrap-around, dialogs stay open
     def find_text(self):
         dlg, le = self.dialogs.load_find_dialog("Find.ui")
         if dlg and le:
@@ -958,17 +1033,14 @@ class NotepadApp(QApplication):
             dlg.exec()
             return
 
-        # fallback using input dialog (one-shot)
         ed = self.tab_widget.get_editor()
         if not ed:
             return
         text, ok = QInputDialog.getText(self.window, "Find", "Text to find:")
         if not ok or not text:
             return
-        # search from current cursor, wrap to top
         found = ed.find(text)
         if not found:
-            # wrap to top
             cursor = ed.textCursor()
             cursor.movePosition(QTextCursor.Start)
             ed.setTextCursor(cursor)
@@ -1001,7 +1073,6 @@ class NotepadApp(QApplication):
                     cancel_btn.clicked.connect(dlg.reject)
             dlg.exec()
             return
-        # fallback plain
         ed = self.tab_widget.get_editor()
         if not ed:
             return
@@ -1041,7 +1112,6 @@ class NotepadApp(QApplication):
                     cancel_btn.clicked.connect(dlg.reject)
             dlg.exec()
             return
-        # fallback manual
         ed = self.tab_widget.get_editor()
         if not ed:
             return
@@ -1069,24 +1139,20 @@ class NotepadApp(QApplication):
         ed = self.tab_widget.get_editor()
         if not ed:
             return
-        # first try from current cursor
         if forward:
             found = ed.find(text)
             if not found:
-                # wrap to top and try again
                 cursor = ed.textCursor()
                 cursor.movePosition(QTextCursor.Start)
                 ed.setTextCursor(cursor)
                 if not ed.find(text):
                     QMessageBox.information(self.window, "Find", f"'{text}' not found")
         else:
-            # backward: manual search from before current pos, wrap to end if not found
             full = ed.toPlainText()
             cursor = ed.textCursor()
             pos = cursor.selectionStart() if cursor.hasSelection() else cursor.position()
             idx = full.rfind(text, 0, max(0, pos - 1))
             if idx == -1:
-                # wrap to end and search backwards
                 idx = full.rfind(text)
                 if idx == -1:
                     QMessageBox.information(self.window, "Find Previous", f"'{text}' not found")
@@ -1096,7 +1162,6 @@ class NotepadApp(QApplication):
             new_cursor.setPosition(idx + len(text), mode=QTextCursor.KeepAnchor)
             ed.setTextCursor(new_cursor)
 
-    # status / title / zoom
     def update_status(self, editor=None):
         editor = editor or self.tab_widget.get_editor()
         if editor:
@@ -1134,27 +1199,33 @@ class NotepadApp(QApplication):
             name = self.tab_widget.tabText(index)
         self.window.setWindowTitle(f"{name} - Notepad")
 
-    # zoom functions (updates label)
-    def zoom_in_current(self, step=1):
-        ed = self.tab_widget.get_editor()
-        if not ed:
+    def zoom_in_editor(self, editor, step=1):
+        if not editor:
             return
-        f = ed.font()
+        f = editor.font()
         size = max(6, f.pointSize() + step)
         f.setPointSize(size)
-        ed.setFont(f)
-        # base 11 -> 100%
-        self.lbl_zoom.setText(f"{round(size/11*100)}%")
+        editor.setFont(f)
+        if editor == self.tab_widget.get_editor():
+            self.lbl_zoom.setText(f"{round(size / 11 * 100)}%")
+
+    def zoom_out_editor(self, editor, step=1):
+        if not editor:
+            return
+        f = editor.font()
+        size = max(6, f.pointSize() - step)
+        f.setPointSize(size)
+        editor.setFont(f)
+        if editor == self.tab_widget.get_editor():
+            self.lbl_zoom.setText(f"{round(size / 11 * 100)}%")
+
+    def zoom_in_current(self, step=1):
+        ed = self.tab_widget.get_editor()
+        self.zoom_in_editor(ed, step)
 
     def zoom_out_current(self, step=1):
         ed = self.tab_widget.get_editor()
-        if not ed:
-            return
-        f = ed.font()
-        size = max(6, f.pointSize() - step)
-        f.setPointSize(size)
-        ed.setFont(f)
-        self.lbl_zoom.setText(f"{round(size/11*100)}%")
+        self.zoom_out_editor(ed, step)
 
     def reset_zoom(self):
         ed = self.tab_widget.get_editor()
@@ -1165,19 +1236,6 @@ class NotepadApp(QApplication):
         ed.setFont(f)
         self.lbl_zoom.setText("100%")
 
-    def eventFilter(self, source, event):
-        if isinstance(source, QPlainTextEdit) and event.type() == QEvent.Wheel:
-            # support Ctrl+wheel zoom for editors
-            if event.modifiers() & Qt.ControlModifier:
-                delta = event.angleDelta().y()
-                if delta > 0:
-                    self.zoom_in_current()
-                else:
-                    self.zoom_out_current()
-                return True
-        return super().eventFilter(source, event)
-
-    # fullscreen & always on top
     def toggle_fullscreen(self):
         if self.window.isFullScreen():
             self.window.showNormal()
@@ -1185,14 +1243,10 @@ class NotepadApp(QApplication):
             self.window.showFullScreen()
 
     def toggle_always_on_top(self):
-        # use setWindowFlag to avoid clobbering other flags (prevents disabled close button)
         current = bool(self.window.windowFlags() & Qt.WindowStaysOnTopHint)
-        # toggle
         self.window.setWindowFlag(Qt.WindowStaysOnTopHint, not current)
-        # re-show to ensure flags take effect
         self.window.show()
 
-    # printing (restored)
     def print_file(self):
         ed = self.tab_widget.get_editor()
         if not ed:
@@ -1202,20 +1256,16 @@ class NotepadApp(QApplication):
         if dlg.exec() == QDialog.Accepted:
             ed.print(printer)
 
-    # encoding menu helpers
     def set_encoding(self, encoding_name):
         if not encoding_name:
             return
-        # normalize whitespace & strip potential ampersand markers (&)
         encoding_name = encoding_name.replace("&", "").strip()
         self.current_encoding = encoding_name
-        # update menu check marks
         enc_actions = self._find_encoding_actions()
         for act in enc_actions:
             enc_text = (act.text() or "").strip()
             if not enc_text:
                 enc_text = act.objectName().replace("action", "").replace("_", "-").strip()
-            # try exact match then case-insensitive
             try:
                 act.setChecked(enc_text == self.current_encoding)
             except Exception:
@@ -1223,15 +1273,12 @@ class NotepadApp(QApplication):
                     act.setChecked(enc_text.lower() == self.current_encoding.lower())
                 except Exception:
                     pass
-        # update status label WITHOUT a checkmark
         try:
             self.lbl_enc.setText(self.current_encoding)
         except Exception:
             pass
-        # persist
         self.save_settings()
 
-    # exit
     def exit_app(self):
         unsaved = False
         for i in range(self.tab_widget.count() - 1):
@@ -1246,7 +1293,7 @@ class NotepadApp(QApplication):
                 return
         self.quit()
 
-# ---------- run ----------
+
 if __name__ == "__main__":
     app = NotepadApp(sys.argv)
     sys.exit(app.exec())

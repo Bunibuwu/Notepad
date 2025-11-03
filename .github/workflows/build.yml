@@ -26,6 +26,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install nuitka
 
       - name: Build with Nuitka
         uses: Nuitka/Nuitka-Action@main
@@ -34,9 +35,10 @@ jobs:
           script-name: main.py
           mode: standalone
           enable-plugins: pyside6
-          # include your capitalized Themes folder
+          # include your custom Themes folder
           include-data-dir: |
             Themes=Themes
+          # include UI files and JSON settings
           include-data-files: |
             Main.ui=Main.ui
             Find.ui=Find.ui
@@ -45,13 +47,11 @@ jobs:
             Replace.ui=Replace.ui
             Themes.ui=Themes.ui
             settings.json=settings.json
-          # include common Qt plugins (adjust if runtime complains)
-          include-qt-plugins: sensible
-          # output folder for build artifacts
+          # include essential Qt plugins so built-in themes work
+          include-qt-plugins: platforms, styles, sensible
           output-dir: build
-          # tune build flags (valid values where required)
           jobs: 2
-          lto: auto          # valid choices: 'yes', 'no', 'auto'
+          lto: auto
           disable-console: yes
 
       - name: Upload build artifact
