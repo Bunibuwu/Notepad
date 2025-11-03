@@ -13,11 +13,11 @@ from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, Qt, QSize, QEvent, QRegularExpression, QObject
 from PySide6.QtGui import QMouseEvent, QTextCursor, QIcon, QFont, QSyntaxHighlighter, QTextCharFormat, QColor, QAction
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
-import qt_themes  # pip install qt-themes
+import qt_themes
 
 # Config / paths
 SETTINGS_FILE = "settings.json"
-THEMES_FOLDER = "Themes"  # capital T — match repo folder
+THEMES_FOLDER = "Themes"
 HERE = Path(__file__).parent
 
 
