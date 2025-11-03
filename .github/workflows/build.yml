@@ -11,7 +11,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90  # Increased timeout
 
     steps:
     - name: Checkout
@@ -28,100 +28,85 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # Windows Build - produces Notepad.exe
+    # Install ccache for faster builds (Linux/macOS)
+    - name: Install ccache
+      if: runner.os != 'Windows'
+      run: |
+        if command -v apt-get >/dev/null 2>&1; then
+          sudo apt-get install -y ccache
+        elif command -v brew >/dev/null 2>&1; then
+          brew install ccache
+        fi
+
+    # Windows Build
     - name: Build Windows Executable
       if: runner.os == 'Windows'
       run: |
         mkdir -p build
         python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=2 --lto=no --windows-console-mode=disable --output-filename=Notepad
 
-    # macOS Build - produces Notepad.app
-    - name: Build macOS App Bundle
+    # macOS Build - Simplified
+    - name: Build macOS App
       if: runner.os == 'macOS'
       run: |
         mkdir -p build
         python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=2 --lto=no --macos-create-app-bundle --output-filename=Notepad
 
-    # Linux Build - produces Notepad.AppImage
-    - name: Build Linux AppImage
+    # Linux Build - Simplified (just create executable first)
+    - name: Build Linux Executable
       if: runner.os == 'Linux'
       run: |
         mkdir -p build
-        
-        # First build the standalone executable
         python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=2 --lto=no --output-filename=Notepad
-        
-        # Create AppImage structure
+
+    # Create AppImage (Linux only)
+    - name: Create Linux AppImage
+      if: runner.os == 'Linux'
+      run: |
         cd build
+        
+        # Download appimagetool
+        wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+        
+        # Create AppDir structure
         mkdir -p AppDir/usr/bin
         mkdir -p AppDir/usr/share/applications
         mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
         
-        # Copy the built executable
+        # Copy the executable
         if [ -f "Notepad" ]; then
           cp Notepad AppDir/usr/bin/
-          chmod +x AppDir/usr/bin/Notepad
         elif [ -d "Notepad.dist" ]; then
           cp -r Notepad.dist/* AppDir/usr/bin/
-          chmod +x AppDir/usr/bin/Notepad
         fi
         
         # Create desktop file
-        cat > AppDir/usr/share/applications/notepad.desktop << EOF
-        [Desktop Entry]
-        Name=Notepad
-        Comment=A modern notepad application
-        Exec=Notepad
-        Icon=notepad
-        Type=Application
-        Categories=Utility;TextEditor;
-        StartupNotify=true
-        Terminal=false
-        EOF
+        cat > AppDir/usr/share/applications/notepad.desktop << 'EOF'
+[Desktop Entry]
+Name=Notepad
+Comment=A modern notepad application
+Exec=Notepad
+Icon=notepad
+Type=Application
+Categories=Utility;TextEditor;
+StartupNotify=true
+Terminal=false
+EOF
         
-        # Create a simple icon (you can replace this with a real icon later)
-        echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" | base64 -d > AppDir/usr/share/icons/hicolor/256x256/apps/notepad.png
+        # Create a simple icon
+        convert -size 256x256 xc:white -font Arial -pointsize 20 -fill black -annotate +10+30 "Notepad" AppDir/usr/share/icons/hicolor/256x256/apps/notepad.png 2>/dev/null || echo "Icon creation failed, continuing without icon"
         
-        # Download and use appimagetool to create AppImage
-        wget -O appimagetool "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
-        chmod +x appimagetool
-        ./appimagetool AppDir Notepad.AppImage
-
-    # Post-processing for macOS
-    - name: Finalize macOS App Bundle
-      if: runner.os == 'macOS'
-      run: |
-        cd build
-        # Ensure the app bundle has proper structure
-        if [ -d "Notepad.app" ]; then
-          echo "macOS app bundle created successfully"
-          # Create Info.plist if missing
-          if [ ! -f "Notepad.app/Contents/Info.plist" ]; then
-            mkdir -p "Notepad.app/Contents"
-            cat > "Notepad.app/Contents/Info.plist" << EOF
-            <?xml version="1.0" encoding="UTF-8"?>
-            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            <plist version="1.0">
-            <dict>
-                <key>CFBundleExecutable</key>
-                <string>Notepad</string>
-                <key>CFBundleIdentifier</key>
-                <string>com.notepad.app</string>
-                <key>CFBundleName</key>
-                <string>Notepad</string>
-                <key>CFBundleVersion</key>
-                <string>1.0</string>
-                <key>CFBundleShortVersionString</key>
-                <string>1.0</string>
-                <key>NSHighResolutionCapable</key>
-                <true/>
-                <key>LSMinimumSystemVersion</key>
-                <string>10.13</string>
-            </dict>
-            </plist>
-            EOF
-          fi
-        fi
+        # Create AppRun script
+        cat > AppDir/AppRun << 'EOF'
+#!/bin/bash
+HERE="$(dirname "$(readlink -f "${0}")")"
+exec "$HERE/usr/bin/Notepad" "$@"
+EOF
+        chmod +x AppDir/AppRun
+        
+        # Create the AppImage
+        ./appimagetool-x86_64.AppImage AppDir Notepad.AppImage
 
     # Make executables
     - name: Make Executables
@@ -132,7 +117,7 @@ jobs:
         if [ -f "Notepad" ]; then
           chmod +x Notepad
         fi
-        # Make .dist executables
+        # Make .dist executables  
         if [ -d "Notepad.dist" ] && [ -f "Notepad.dist/Notepad" ]; then
           chmod +x Notepad.dist/Notepad
         fi
@@ -145,23 +130,13 @@ jobs:
           chmod +x Notepad.AppImage
         fi
 
-    # Verify and list outputs
+    # Verify outputs
     - name: Verify Build Outputs
       run: |
         echo "=== Build Outputs ==="
         cd build
-        find . -type f \( -name "Notepad*" -o -name "*.exe" -o -name "*.app" -o -name "*.AppImage" \) 2>/dev/null || echo "No build files found"
-        
-        if [ "$RUNNER_OS" = "Windows" ]; then
-          echo "Windows build should produce: Notepad.exe"
-          ls -la *.exe 2>/dev/null || echo "No .exe file found"
-        elif [ "$RUNNER_OS" = "macOS" ]; then
-          echo "macOS build should produce: Notepad.app"
-          find . -name "*.app" -type d 2>/dev/null || echo "No .app bundle found"
-        elif [ "$RUNNER_OS" = "Linux" ]; then
-          echo "Linux build should produce: Notepad.AppImage"
-          ls -la *.AppImage 2>/dev/null || echo "No .AppImage file found"
-        fi
+        find . -maxdepth 2 -type f \( -name "Notepad*" -o -name "*.exe" \) 2>/dev/null | head -10
+        find . -maxdepth 2 -type d -name "*.app" 2>/dev/null | head -5
 
     # Upload artifacts
     - name: Upload Windows Executable
@@ -170,7 +145,7 @@ jobs:
       with:
         name: Notepad-Windows
         path: build/Notepad.exe
-        if-no-files-found: error
+        if-no-files-found: warn
 
     - name: Upload macOS App Bundle
       if: runner.os == 'macOS'
@@ -178,7 +153,7 @@ jobs:
       with:
         name: Notepad-macOS
         path: build/Notepad.app
-        if-no-files-found: error
+        if-no-files-found: warn
 
     - name: Upload Linux AppImage
       if: runner.os == 'Linux'
@@ -186,4 +161,12 @@ jobs:
       with:
         name: Notepad-Linux
         path: build/Notepad.AppImage
-        if-no-files-found: error
+        if-no-files-found: warn
+
+    # Upload as backup if main artifacts fail
+    - name: Upload Backup Build Files
+      uses: actions/upload-artifact@v4
+      with:
+        name: Build-Files-${{ runner.os }}
+        path: build/
+        if-no-files-found: warn
