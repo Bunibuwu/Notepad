@@ -1,4 +1,4 @@
-name: CI - build desktop apps (Nuitka)
+name: CI - Build Desktop Apps (Nuitka)
 
 on:
   push:
@@ -11,8 +11,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -26,7 +27,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install nuitka
 
       - name: Build with Nuitka
         uses: Nuitka/Nuitka-Action@main
@@ -35,10 +35,10 @@ jobs:
           script-name: main.py
           mode: standalone
           enable-plugins: pyside6
-          # include your custom Themes folder
+          # Include your custom Themes folder
           include-data-dir: |
             Themes=Themes
-          # include UI files and JSON settings
+          # Include UI files and other required files
           include-data-files: |
             Main.ui=Main.ui
             Find.ui=Find.ui
@@ -47,11 +47,15 @@ jobs:
             Replace.ui=Replace.ui
             Themes.ui=Themes.ui
             settings.json=settings.json
-          # include essential Qt plugins so built-in themes work
-          include-qt-plugins: platforms, styles, sensible
+          # Include required Qt plugins for cross-platform theme support
+          include-qt-plugins: platforms, platformthemes, sensible
+          # Output folder for build artifacts
           output-dir: build
+          # Parallel compilation
           jobs: 2
+          # Link-time optimization
           lto: auto
+          # Disable console on Windows
           disable-console: yes
 
       - name: Upload build artifact
