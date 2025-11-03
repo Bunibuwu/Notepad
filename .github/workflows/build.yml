@@ -1,0 +1,62 @@
+name: CI - build desktop apps (Nuitka)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: '**/requirements*.txt'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build with Nuitka
+        uses: Nuitka/Nuitka-Action@main
+        with:
+          nuitka-version: main
+          script-name: main.py
+          mode: standalone             # creates a runnable folder (safer)
+          enable-plugins: pyside6     # ensures PySide6 support
+          # include folder(s) and single files (action supports newline lists)
+          include-data-dir: |
+            themes=Themes
+          include-data-files: |
+            Main.ui=Main.ui
+            Find.ui=Find.ui
+            FindNext.ui=FindNext.ui
+            FindPrev.ui=FindPrev.ui
+            Replace.ui=Replace.ui
+            Themes.ui=Themes.ui
+            settings.json=settings.json
+          extra-args: |
+            --include-qt-plugins=sensible
+            --remove-output
+            --output-dir=build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-build
+          path: |
+            build/*.exe
+            build/*.bin
+            build/*.app/**/*
+            build/*.dist/**/*
+          include-hidden-files: true
