@@ -28,78 +28,32 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Build with Nuitka
+    - name: Build with Nuitka - Windows
+      if: runner.os == 'Windows'
       run: |
         mkdir -p build
-        
-        # Platform-specific Nuitka commands
-        if [ "$RUNNER_OS" = "Windows" ]; then
-          python -m nuitka main.py `
-            --standalone `
-            --enable-plugin=pyside6 `
-            --include-data-dir=Themes=Themes `
-            --include-data-file=Main.ui=Main.ui `
-            --include-data-file=Find.ui=Find.ui `
-            --include-data-file=FindNext.ui=FindNext.ui `
-            --include-data-file=FindPrev.ui=FindPrev.ui `
-            --include-data-file=Replace.ui=Replace.ui `
-            --include-data-file=Themes.ui=Themes.ui `
-            --include-data-file=settings.json=settings.json `
-            --include-package-data=qt_themes `
-            --include-qt-plugins=sensible `
-            --output-dir=build `
-            --jobs=2 `
-            --lto=no `  # Disable LTO to speed up compilation
-            --windows-console-mode=disable `
-            --output-filename=Notepad
-        elif [ "$RUNNER_OS" = "macOS" ]; then
-          python -m nuitka main.py \
-            --standalone \
-            --enable-plugin=pyside6 \
-            --include-data-dir=Themes=Themes \
-            --include-data-file=Main.ui=Main.ui \
-            --include-data-file=Find.ui=Find.ui \
-            --include-data-file=FindNext.ui=FindNext.ui \
-            --include-data-file=FindPrev.ui=FindPrev.ui \
-            --include-data-file=Replace.ui=Replace.ui \
-            --include-data-file=Themes.ui=Themes.ui \
-            --include-data-file=settings.json=settings.json \
-            --include-package-data=qt_themes \
-            --include-qt-plugins=sensible \
-            --output-dir=build \
-            --jobs=2 \
-            --lto=no \
-            --macos-create-app-bundle \
-            --output-filename=Notepad
-        else
-          # Linux
-          python -m nuitka main.py \
-            --standalone \
-            --enable-plugin=pyside6 \
-            --include-data-dir=Themes=Themes \
-            --include-data-file=Main.ui=Main.ui \
-            --include-data-file=Find.ui=Find.ui \
-            --include-data-file=FindNext.ui=FindNext.ui \
-            --include-data-file=FindPrev.ui=FindPrev.ui \
-            --include-data-file=Replace.ui=Replace.ui \
-            --include-data-file=Themes.ui=Themes.ui \
-            --include-data-file=settings.json=settings.json \
-            --include-package-data=qt_themes \
-            --include-qt-plugins=sensible \
-            --output-dir=build \
-            --jobs=2 \
-            --lto=no \
-            --output-filename=Notepad
-        fi
+        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=2 --lto=no --windows-console-mode=disable --output-filename=Notepad
+
+    - name: Build with Nuitka - macOS
+      if: runner.os == 'macOS'
+      run: |
+        mkdir -p build
+        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=2 --lto=no --macos-create-app-bundle --output-filename=Notepad
+
+    - name: Build with Nuitka - Linux
+      if: runner.os == 'Linux'
+      run: |
+        mkdir -p build
+        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=2 --lto=no --output-filename=Notepad
 
     - name: Fix macOS app bundle structure
       if: runner.os == 'macOS'
       run: |
         cd build
         if [ -d "Notepad.app" ]; then
-          # Ensure the app bundle has proper structure
+          echo "Found Notepad.app bundle"
           if [ ! -f "Notepad.app/Contents/MacOS/Notepad" ]; then
-            # If the main executable is in a .dist folder, move it
+            echo "Moving executable to proper location"
             if [ -f "Notepad.dist/Notepad" ]; then
               mkdir -p "Notepad.app/Contents/MacOS"
               cp "Notepad.dist/Notepad" "Notepad.app/Contents/MacOS/Notepad"
@@ -115,20 +69,23 @@ jobs:
         # For regular executables
         if [ -f "Notepad" ]; then
           chmod +x Notepad
+          echo "Made Notepad executable"
         fi
         # For .dist folders
         if [ -d "Notepad.dist" ] && [ -f "Notepad.dist/Notepad" ]; then
           chmod +x Notepad.dist/Notepad
+          echo "Made Notepad.dist/Notepad executable"
         fi
         # For app bundles on macOS
         if [ -d "Notepad.app" ] && [ -f "Notepad.app/Contents/MacOS/Notepad" ]; then
           chmod +x Notepad.app/Contents/MacOS/Notepad
+          echo "Made Notepad.app/Contents/MacOS/Notepad executable"
         fi
 
     - name: List build contents for debugging
       run: |
         echo "=== Build directory structure ==="
-        find build/ -type f -name "Notepad*" -o -name "*.exe" -o -name "*.app" | head -20
+        find build/ -type f -name "Notepad*" -o -name "*.exe" -o -name "*.app" 2>/dev/null | head -20 || echo "No build files found"
         if [ -d "build/Notepad.dist" ]; then
           echo "=== Notepad.dist contents ==="
           ls -la build/Notepad.dist/ | head -10
