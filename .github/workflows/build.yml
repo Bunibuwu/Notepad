@@ -28,13 +28,17 @@ jobs:
         python -m pip install --upgrade pip
         pip install PySide6 pyinstaller qt-themes
 
-    # Optional: make sure build folders are clean and consistent
+    # Windows-compatible directory creation
     - name: Prepare directories
       run: |
-        mkdir -p build dist
+        if ($IsWindows) {
+          New-Item -ItemType Directory -Force -Path "build", "dist"
+        } else {
+          mkdir -p build dist
+        }
+      shell: pwsh
 
     - name: Build executable
-      shell: bash
       run: |
         echo "Running compile script for $RUNNER_OS"
         if [[ "$RUNNER_OS" == "Windows" ]]; then
@@ -44,6 +48,7 @@ jobs:
         else
           python compile.py --os linux
         fi
+      shell: bash
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
