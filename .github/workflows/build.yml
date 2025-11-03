@@ -11,7 +11,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 120  # 2 hour timeout
 
     steps:
     - name: Checkout
@@ -33,93 +33,36 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         mkdir -p build
-        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=2 --lto=no --windows-console-mode=disable --output-filename=Notepad
+        echo "Starting Windows build..."
+        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=1 --lto=no --windows-console-mode=disable --output-filename=Notepad
 
     # macOS Build - produces Notepad.app
     - name: Build macOS App Bundle
       if: runner.os == 'macOS'
       run: |
         mkdir -p build
-        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=2 --lto=no --macos-create-app-bundle --output-filename=Notepad
+        echo "Starting macOS build..."
+        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=1 --lto=no --macos-create-app-bundle --output-filename=Notepad
 
     # Linux Build - produces Notepad executable
     - name: Build Linux Executable
       if: runner.os == 'Linux'
       run: |
         mkdir -p build
-        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=2 --lto=no --output-filename=Notepad
+        echo "Starting Linux build..."
+        python -m nuitka main.py --standalone --enable-plugin=pyside6 --include-data-dir=Themes=Themes --include-data-file=Main.ui=Main.ui --include-data-file=Find.ui=Find.ui --include-data-file=FindNext.ui=FindNext.ui --include-data-file=FindPrev.ui=FindPrev.ui --include-data-file=Replace.ui=Replace.ui --include-data-file=Themes.ui=Themes.ui --include-data-file=settings.json=settings.json --include-package-data=qt_themes --include-qt-plugins=sensible --output-dir=build --jobs=1 --lto=no --output-filename=Notepad
 
-    # Create AppImage (Linux only) - using a script file to avoid heredoc issues
-    - name: Create Linux AppImage
+    # Make Linux executable
+    - name: Make Linux Executable
       if: runner.os == 'Linux'
-      run: |
-        # Create the AppImage creation script
-        cat > create_appimage.sh << 'SCRIPT_EOF'
-        #!/bin/bash
-        cd build
-        
-        # Download appimagetool
-        wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-        chmod +x appimagetool-x86_64.AppImage
-        
-        # Create AppDir structure
-        mkdir -p AppDir/usr/bin
-        mkdir -p AppDir/usr/share/applications
-        mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-        
-        # Copy the executable
-        if [ -f "Notepad" ]; then
-          cp Notepad AppDir/usr/bin/
-        elif [ -d "Notepad.dist" ]; then
-          cp -r Notepad.dist/* AppDir/usr/bin/
-        fi
-        
-        # Create desktop file using printf to avoid heredoc
-        printf "%s\n" \
-          "[Desktop Entry]" \
-          "Name=Notepad" \
-          "Comment=A modern notepad application" \
-          "Exec=Notepad" \
-          "Icon=notepad" \
-          "Type=Application" \
-          "Categories=Utility;TextEditor;" \
-          "StartupNotify=true" \
-          "Terminal=false" \
-          > AppDir/usr/share/applications/notepad.desktop
-        
-        # Create AppRun script
-        printf "%s\n" \
-          "#!/bin/bash" \
-          'HERE="$(dirname "$(readlink -f "${0}")")"' \
-          'exec "$HERE/usr/bin/Notepad" "$@"' \
-          > AppDir/AppRun
-        
-        chmod +x AppDir/AppRun
-        
-        # Create the AppImage
-        ./appimagetool-x86_64.AppImage AppDir Notepad.AppImage
-        SCRIPT_EOF
-        
-        # Make the script executable and run it
-        chmod +x create_appimage.sh
-        ./create_appimage.sh
-
-    # Make executables executable
-    - name: Make Executables
-      if: runner.os != 'Windows'
       run: |
         cd build
         if [ -f "Notepad" ]; then
           chmod +x Notepad
-        fi
-        if [ -d "Notepad.dist" ] && [ -f "Notepad.dist/Notepad" ]; then
+          echo "Linux executable created: Notepad"
+        elif [ -d "Notepad.dist" ]; then
           chmod +x Notepad.dist/Notepad
-        fi
-        if [ -d "Notepad.app" ] && [ -f "Notepad.app/Contents/MacOS/Notepad" ]; then
-          chmod +x Notepad.app/Contents/MacOS/Notepad
-        fi
-        if [ -f "Notepad.AppImage" ]; then
-          chmod +x Notepad.AppImage
+          echo "Linux executable created: Notepad.dist/Notepad"
         fi
 
     # Verify outputs
@@ -128,7 +71,7 @@ jobs:
         echo "=== Build Outputs for ${{ runner.os }} ==="
         cd build
         ls -la 2>/dev/null || echo "Build directory is empty"
-        find . -maxdepth 2 -type f \( -name "Notepad*" -o -name "*.exe" -o -name "*.AppImage" \) 2>/dev/null | head -10
+        find . -maxdepth 2 -type f \( -name "Notepad*" -o -name "*.exe" \) 2>/dev/null | head -10
         find . -maxdepth 2 -type d \( -name "*.app" -o -name "*.dist" \) 2>/dev/null | head -10
 
     # Upload artifacts
@@ -137,7 +80,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: Notepad-Windows
-        path: build/Notepad.exe
+        path: |
+          build/Notepad.exe
+          build/Notepad.dist/
         if-no-files-found: warn
 
     - name: Upload macOS App Bundle
@@ -145,21 +90,17 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: Notepad-macOS
-        path: build/Notepad.app
+        path: |
+          build/Notepad.app
+          build/Notepad.dist/
         if-no-files-found: warn
 
-    - name: Upload Linux AppImage
+    - name: Upload Linux Executable
       if: runner.os == 'Linux'
       uses: actions/upload-artifact@v4
       with:
         name: Notepad-Linux
-        path: build/Notepad.AppImage
-        if-no-files-found: warn
-
-    # Upload backup if main artifacts fail
-    - name: Upload Build Directory Backup
-      uses: actions/upload-artifact@v4
-      with:
-        name: Build-Directory-${{ runner.os }}
-        path: build/
+        path: |
+          build/Notepad
+          build/Notepad.dist/
         if-no-files-found: warn
