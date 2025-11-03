@@ -1,52 +1,52 @@
-name: Build Notepad App
+name: Build NotepadApp
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        python-version: [3.12]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: |
-          pip install pyinstaller
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PySide6 pyinstaller qt-themes
 
-      - name: Build with PyInstaller
-        shell: bash
-        run: |
-          mkdir -p build
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            pyinstaller --onefile --windowed --name Notepad `
-              --add-data "Themes;Themes" `
-              --add-data "*.ui;." `
-              --add-data "settings.json;." `
-              main.py
-          else
-            pyinstaller --onefile --windowed --name Notepad \
-              --add-data "Themes:Themes" \
-              --add-data "*.ui:." \
-              --add-data "settings.json:." \
-              main.py
-          fi
-          cp dist/Notepad* build/
+    # Optional: make sure build folders are clean and consistent
+    - name: Prepare directories
+      run: |
+        mkdir -p build dist
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Notepad-${{ matrix.os }}
-          path: build/
+    - name: Build executable
+      shell: bash
+      run: |
+        echo "Running compile script for $RUNNER_OS"
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          python compile.py --os windows
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          python compile.py --os macos
+        else
+          python compile.py --os linux
+        fi
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: NotepadApp-${{ matrix.os }}
+        path: dist/*
