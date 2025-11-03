@@ -34,6 +34,7 @@ jobs:
           script-name: main.py
           mode: standalone
           enable-plugins: pyside6
+          # include your capitalized Themes folder
           include-data-dir: |
             Themes=Themes
           include-data-files: |
@@ -44,16 +45,18 @@ jobs:
             Replace.ui=Replace.ui
             Themes.ui=Themes.ui
             settings.json=settings.json
+          # include common Qt plugins (adjust if runtime complains)
           include-qt-plugins: sensible
+          # output folder for build artifacts
           output-dir: build
+          # tune build flags (valid values where required)
           jobs: 2
-          lto: true
-          disable-console: true
+          lto: auto          # valid choices: 'yes', 'no', 'auto'
+          disable-console: yes
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-build
-          path: |
-            build/**
+          path: build/**
           include-hidden-files: true
